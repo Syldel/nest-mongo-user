@@ -64,13 +64,6 @@ describe('Internal users (service-to-service)', () => {
   });
 
   describe('get agent-credentials', () => {
-    it('❌ returns 404 if user has no agentKey', async () => {
-      await request(app.getHttpServer())
-        .get(`/internal/users/${userId}/agent-credentials`)
-        .set('Authorization', `Bearer ${serviceToken}`)
-        .expect(404);
-    });
-
     it('❌ rejects missing token', async () => {
       await request(app.getHttpServer())
         .get(`/internal/users/${userId}/agent-credentials`)
@@ -87,6 +80,30 @@ describe('Internal users (service-to-service)', () => {
         .get(`/internal/users/${userId}/agent-credentials`)
         .set('Authorization', `Bearer ${badScopeToken}`)
         .expect(403);
+    });
+
+    it('❌ returns 403 if missing users:agentKey scope', async () => {
+      const badScopeToken = generateServiceToken(
+        process.env.JWT_SERVICE_SECRET || '',
+        ['users:read'],
+      );
+
+      await request(app.getHttpServer())
+        .get(`/internal/users/${userId}/agent-credentials`)
+        .set('Authorization', `Bearer ${badScopeToken}`)
+        .expect(403);
+    });
+
+    it('❌ returns 404 if user has no agentKey', async () => {
+      const goodScopeToken = generateServiceToken(
+        process.env.JWT_SERVICE_SECRET || '',
+        ['users:read', 'users:agentKey'],
+      );
+
+      await request(app.getHttpServer())
+        .get(`/internal/users/${userId}/agent-credentials`)
+        .set('Authorization', `Bearer ${goodScopeToken}`)
+        .expect(404);
     });
   });
 });

@@ -30,7 +30,7 @@ export class InternalUsersController {
     return this.usersService.deleteByWallet(wallet);
   }
 
-  @ServiceAccess('users:read')
+  @ServiceAccess('users:read', 'users:agentKey')
   @Get(':userId/agent-credentials')
   async getAgentCredentials(@Param('userId') userId: string) {
     const user = await this.usersService.findByIdWithAgentKey(userId);
