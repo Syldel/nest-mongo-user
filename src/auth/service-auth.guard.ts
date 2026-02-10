@@ -9,10 +9,6 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { JwtServicePayload } from './interfaces/jwt-service-payload.interface';
 
-interface ServiceRequest extends Request {
-  service?: JwtServicePayload;
-}
-
 @Injectable()
 export class ServiceAuthGuard implements CanActivate {
   constructor(
@@ -21,7 +17,7 @@ export class ServiceAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<ServiceRequest>();
+    const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
     if (!token) {
       throw new UnauthorizedException('Service token missing');
@@ -36,7 +32,10 @@ export class ServiceAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid service token');
     }
 
-    request.service = payload;
+    request.service = {
+      id: payload.sub,
+      scope: payload.scope,
+    };
 
     return true;
   }

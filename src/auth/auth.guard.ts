@@ -9,10 +9,6 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 
-interface RequestWithUser extends Request {
-  user?: JwtUserPayload;
-}
-
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -21,7 +17,7 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<RequestWithUser>();
+    const request = context.switchToHttp().getRequest<Request>();
 
     const token = this.extractTokenFromHeader(request);
     if (!token) throw new UnauthorizedException('Token missing');
@@ -36,7 +32,7 @@ export class AuthGuard implements CanActivate {
     }
 
     request.user = {
-      sub: payload.sub,
+      id: payload.sub,
       wallet: payload.wallet,
       username: payload.username,
     };

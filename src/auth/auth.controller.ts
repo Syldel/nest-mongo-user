@@ -8,15 +8,11 @@ import {
   Patch,
   ForbiddenException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { AuthGuard } from './auth.guard';
-import { ActiveUser } from './interfaces/active-user.interface';
-
-interface RequestWithUser extends Request {
-  user: ActiveUser;
-}
 
 @Controller('auth')
 export class AuthController {
@@ -40,16 +36,16 @@ export class AuthController {
 
   @UseGuards(AuthGuard)
   @Get('me')
-  getProfile(@Req() req: RequestWithUser) {
-    return this.usersService.findById(req.user.sub);
+  getProfile(@Req() req: Request) {
+    return this.usersService.findById(req.user!.id);
   }
 
   @UseGuards(AuthGuard)
   @Patch('strategy')
   async updateMyStrategy(
-    @Req() req: RequestWithUser,
+    @Req() req: Request,
     @Body() strategyDto: Record<string, unknown>,
   ) {
-    return this.usersService.updateStrategy(req.user.sub, strategyDto);
+    return this.usersService.updateStrategy(req.user!.id, strategyDto);
   }
 }

@@ -1,5 +1,5 @@
 export interface JwtServicePayload {
-  service: string;
+  sub: string; // service id
   scope: string[];
   iat?: number;
   exp?: number;

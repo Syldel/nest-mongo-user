@@ -1,5 +1,5 @@
 export interface ActiveUser {
-  sub: string;
+  id: string;
   wallet: string;
   username: string;
 }
