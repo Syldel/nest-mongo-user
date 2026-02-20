@@ -2,12 +2,14 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
+import { UsersService } from '../users/users.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
+import { User } from '../users/user.schema';
 
 @Injectable()
 export class AuthService {
@@ -17,12 +19,22 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const { walletAddress, username, password } = dto;
+    const walletAddress = dto.walletAddress.trim();
+    const username = dto.username.trim().toLowerCase();
+    const password = dto.password;
 
-    // Check if user exists
-    const existingUser = await this.usersService.findOneByWallet(walletAddress);
-    if (existingUser) {
+    // Check if user exists (Wallet address)
+    const existingWallet =
+      await this.usersService.findOneByWallet(walletAddress);
+    if (existingWallet) {
       throw new ConflictException('Wallet address already registered');
+    }
+
+    // Check if user exists (Username)
+    const existingUsername =
+      await this.usersService.findOneByUsername(username);
+    if (existingUsername) {
+      throw new ConflictException('Username already taken');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -34,7 +46,16 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findOneByWallet(dto.walletAddress);
+    let user: User | null;
+    if (dto.username) {
+      user = await this.usersService.findOneByUsernameForAuth(dto.username);
+    } else if (dto.walletAddress) {
+      user = await this.usersService.findOneByWalletForAuth(dto.walletAddress);
+    } else {
+      throw new BadRequestException(
+        'username or walletAddress must be provided',
+      );
+    }
 
     if (user && (await bcrypt.compare(dto.password, user.password))) {
       const payload: JwtUserPayload = {

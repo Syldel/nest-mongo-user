@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { randomBytes } from 'crypto';
 import { AppModule } from '../src/app.module';
 import {
   generateExpiredUserToken,
@@ -12,8 +13,11 @@ import { User } from '../src/users/user.schema';
 describe('Auth e2e', () => {
   let app: INestApplication<App>;
 
-  const wallet = '0x1111111111111111111111111111111111111111';
-  const username = 'testuser';
+  const randomHex = (bytes: number): string =>
+    randomBytes(bytes).toString('hex');
+
+  const wallet = `0x${randomHex(20)}`;
+  const username = 'TestUser_01';
   const password = 'SuperPassword123';
 
   let accessToken: string;
@@ -28,6 +32,13 @@ describe('Auth e2e', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
 
     serviceToken = generateServiceToken(process.env.JWT_SERVICE_SECRET, [
@@ -57,6 +68,50 @@ describe('Auth e2e', () => {
 
       const user = res.body as User;
       expect(user.walletAddress).toBe(wallet);
+      expect(user.username).toBe(username.toLowerCase());
+      expect(user).not.toHaveProperty('password');
+      expect(user).not.toHaveProperty('agentKey');
+    });
+
+    describe('❌ Register - invalid usernames', () => {
+      const invalidUsernames = [
+        'jo', // too short
+        '_john', // starts with _
+        'john_', // ends with _
+        'john__doe', // double _
+        'john..doe', // double .
+        'john--doe', // double -
+        'john#doe', // invalid char
+        'john doe', // space
+        'a'.repeat(21), // too long
+      ];
+
+      it.each(invalidUsernames)(
+        'should reject username: "%s"',
+        async (username) => {
+          const res = await request(app.getHttpServer())
+            .post('/auth/register')
+            .send({
+              username,
+              walletAddress: `0x${randomHex(20)}`,
+              password: 'password123',
+            })
+            .expect(400);
+
+          const body = res.body as {
+            statusCode: number;
+            message: string[] | string;
+            error: string;
+          };
+
+          expect(body.message).toBeDefined();
+          if (Array.isArray(body.message)) {
+            expect(body.message.join(' ')).toContain('Username must be');
+          } else {
+            expect(body.message).toContain('Username must be');
+          }
+        },
+      );
     });
 
     it('❌ cannot register same wallet twice', async () => {
@@ -64,6 +119,18 @@ describe('Auth e2e', () => {
         .post('/auth/register')
         .send({
           walletAddress: wallet,
+          username: 'other_username',
+          password,
+        })
+        .expect(409);
+    });
+
+    it('❌ cannot register same username twice', async () => {
+      const otherWallet = `0x${randomHex(20)}`;
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          walletAddress: otherWallet,
           username,
           password,
         })
@@ -72,7 +139,7 @@ describe('Auth e2e', () => {
   });
 
   describe('login user', () => {
-    it('✅ login user', async () => {
+    it('✅ login user (with walletAddress)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/login')
         .send({
@@ -88,11 +155,28 @@ describe('Auth e2e', () => {
       accessToken = body.access_token;
     });
 
+    it('✅ login user (with username)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          username,
+          password,
+        })
+        .expect(201);
+
+      const body = res.body as {
+        access_token: string;
+      };
+      expect(body.access_token).toBeDefined();
+      accessToken = body.access_token;
+    });
+
     it('❌ login with non-existent wallet', async () => {
+      const otherWallet = `0x${randomHex(20)}`;
       await request(app.getHttpServer())
         .post('/auth/login')
         .send({
-          walletAddress: '0x0000000000000000000000000000000000000000',
+          walletAddress: otherWallet,
           password: 'anyPassword',
         })
         .expect(401);
@@ -118,6 +202,8 @@ describe('Auth e2e', () => {
 
       const user = res.body as User;
       expect(user.walletAddress).toBe(wallet);
+      expect(user).not.toHaveProperty('password');
+      expect(user).not.toHaveProperty('agentKey');
     });
 
     it('❌ get my profile without JWT', async () => {
@@ -148,5 +234,7 @@ describe('Auth e2e', () => {
 
     const user = res.body as User;
     expect(user.tradingSettings.bot).toBe('mean-reversion');
+    expect(user).not.toHaveProperty('password');
+    expect(user).not.toHaveProperty('agentKey');
   });
 });

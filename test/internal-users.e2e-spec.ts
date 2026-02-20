@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { generateServiceToken, generateUserToken } from './helpers/jwt.helper';
+import { User } from '../src/users/user.schema';
 
 describe('Internal users (service-to-service)', () => {
   let app: INestApplication<App>;
@@ -21,6 +22,13 @@ describe('Internal users (service-to-service)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
 
     serviceToken = generateServiceToken(process.env.JWT_SERVICE_SECRET);
@@ -33,10 +41,16 @@ describe('Internal users (service-to-service)', () => {
 
   describe('get all users', () => {
     it('✅ allows access with valid service token', async () => {
-      await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .get('/internal/users')
         .set('Authorization', `Bearer ${serviceToken}`)
         .expect(200);
+
+      const users = res.body as User[];
+      users.forEach((user) => {
+        expect(user).not.toHaveProperty('password');
+        expect(user).not.toHaveProperty('agentKey');
+      });
     });
 
     it('❌ rejects user token', async () => {

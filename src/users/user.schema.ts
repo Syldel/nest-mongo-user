@@ -6,21 +6,20 @@ export class User extends Document {
   @Prop({ unique: true, required: true, lowercase: true, trim: true })
   walletAddress: string;
 
-  @Prop({ unique: true, required: true, trim: true })
+  @Prop({ unique: true, required: true, lowercase: true, trim: true })
   username: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   password: string;
 
   @Prop({ type: Object, default: {} })
   tradingSettings: Record<string, any>;
 
-  @Prop({ type: Object })
+  @Prop({ type: Object, select: false })
   agentKey: {
     encryptedData: string; // La clé d'agent chiffrée
     iv: string; // Le vecteur d'initialisation
     tag: string; // Le tag d'authentification AES-GCM
-    address: string; // L'adresse publique de l'agent (utile pour l'API)
   };
 }
 

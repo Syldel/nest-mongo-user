@@ -1,5 +1,12 @@
 const crypto = require('crypto');
 
+/*
+Generate a secure secret:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+*/
+
 // CONFIGURATION
 const MASTER_KEY = '---------'; // Must be 64 hex characters
 const AGENT_PRIVATE_KEY = '---------';
