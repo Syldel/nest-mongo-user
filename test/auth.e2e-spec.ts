@@ -237,4 +237,75 @@ describe('Auth e2e', () => {
     expect(user).not.toHaveProperty('password');
     expect(user).not.toHaveProperty('agentKey');
   });
+
+  describe('change password', () => {
+    const initialPassword = password;
+    const newPassword = 'NewPassword123!';
+    const anotherPassword = 'AnotherPassword123!';
+
+    it('✅ changes password successfully', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          currentPassword: initialPassword,
+          newPassword,
+          confirmPassword: newPassword,
+        })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          walletAddress: wallet,
+          password: initialPassword,
+        })
+        .expect(401);
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          walletAddress: wallet,
+          password: newPassword,
+        })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('access_token');
+    });
+
+    it('❌ fails if current password is wrong', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          currentPassword: 'WrongPassword!',
+          newPassword: anotherPassword,
+          confirmPassword: anotherPassword,
+        })
+        .expect(401);
+    });
+
+    it('❌ fails if passwords do not match', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/password')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          currentPassword: newPassword,
+          newPassword: 'Mismatch123!',
+          confirmPassword: 'Different123!',
+        })
+        .expect(400);
+    });
+
+    it('❌ fails without authentication', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/password')
+        .send({
+          currentPassword: newPassword,
+          newPassword: anotherPassword,
+          confirmPassword: anotherPassword,
+        })
+        .expect(401);
+    });
+  });
 });

@@ -42,6 +42,10 @@ export class UsersService {
     return this.userModel.findById(id).select('-password -agentKey').exec();
   }
 
+  async findByIdForAuth(userId: string): Promise<User | null> {
+    return this.userModel.findById(userId).select('+password').exec();
+  }
+
   async findAll() {
     return this.userModel.find().select('-password -agentKey').exec();
   }

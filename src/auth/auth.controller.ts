@@ -11,7 +11,7 @@ import {
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
 import { AuthGuard } from './auth.guard';
 
 @Controller('auth')
@@ -32,6 +32,15 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('password')
+  async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Password change is disabled in production');
+    }
+    return this.authService.changePassword(req.user!.id, dto);
   }
 
   @UseGuards(AuthGuard)
