@@ -21,7 +21,7 @@ function encrypt(text, masterKey) {
     const tag = cipher.getAuthTag().toString('hex');
 
     return {
-        encryptedData: encrypted,
+        data: encrypted,
         iv: iv.toString('hex'),
         tag: tag
     };

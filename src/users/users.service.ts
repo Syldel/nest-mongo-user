@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from './user.schema';
+import { AgentKey } from '../auth/interfaces/agent-key.interface';
 
 export type SafeUser = Omit<User, 'password' | 'agentKey'>;
 
@@ -67,5 +68,9 @@ export class UsersService {
         { new: true },
       )
       .exec();
+  }
+
+  async updateAgentKey(userId: string, agentKey: AgentKey) {
+    return this.userModel.findByIdAndUpdate(userId, { agentKey });
   }
 }

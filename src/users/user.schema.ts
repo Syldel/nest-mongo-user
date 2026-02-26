@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import type { AgentKey } from '../auth/interfaces/agent-key.interface';
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -16,11 +17,7 @@ export class User extends Document {
   tradingSettings: Record<string, any>;
 
   @Prop({ type: Object, select: false })
-  agentKey: {
-    encryptedData: string; // La clé d'agent chiffrée
-    iv: string; // Le vecteur d'initialisation
-    tag: string; // Le tag d'authentification AES-GCM
-  };
+  agentKey?: AgentKey;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
