@@ -4,6 +4,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { AuthModule } from './auth/auth.module';
 import { ServiceAuthModule } from './auth/service-auth.module';
+import { User, UserSchema } from './users/user.schema';
+import { HttpClientService } from './utils/http-client.service';
+import { WebhookService } from './webhook/webhook.service';
+import { MongoWatcherService } from './watcher/mongo-watcher.service';
 
 @Module({
   imports: [
@@ -17,9 +21,11 @@ import { ServiceAuthModule } from './auth/service-auth.module';
       }),
     }),
 
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+
     AuthModule,
     ServiceAuthModule,
   ],
-  providers: [],
+  providers: [HttpClientService, WebhookService, MongoWatcherService],
 })
 export class AppModule {}
