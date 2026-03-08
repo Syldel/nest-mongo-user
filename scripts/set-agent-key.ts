@@ -11,6 +11,8 @@ import { AppModule } from '../src/app.module';
 import { UsersService } from '../src/users/users.service';
 import { User } from '../src/users/user.schema';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function bootstrap() {
   const HEX64_REGEX = /^[a-fA-F0-9]{64}$/;
   const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
@@ -89,7 +91,11 @@ async function bootstrap() {
     throw new Error('User not found!');
   }
 
+  console.log(colors.cyanText('Wait 6s to close app!'));
+  await sleep(6000);
   await app.close();
+  console.log(colors.greenText('App closed successfully'));
+  process.exit(0);
 }
 
 async function main() {
