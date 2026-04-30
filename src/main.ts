@@ -1,14 +1,39 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { LOG_LEVELS, Logger, LogLevel, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { NestExpressApplication } from '@nestjs/platform-express';
+
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  /* ********************************************** */
+
   const logger = new Logger('bootstrap');
 
+  // Ex: LOG_LEVELS=error,warn,log,debug
+  const envLogLevels = process.env.LOG_LEVELS;
+
+  const defaultLevels: LogLevel[] = isProduction
+    ? ['error', 'warn']
+    : ['log', 'debug', 'warn', 'error', 'verbose'];
+
+  const levels: LogLevel[] = envLogLevels
+    ? envLogLevels
+        .split(',')
+        .map((item) => item.trim().toLowerCase() as LogLevel)
+        .filter((level) => LOG_LEVELS.includes(level))
+    : defaultLevels;
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: levels.length > 0 ? levels : defaultLevels,
+  });
+
   const configService = app.get(ConfigService);
+
+  /* ********************************************** */
 
   const origins = configService
     .get<string>('CORS_ORIGINS')
@@ -33,6 +58,8 @@ async function bootstrap() {
 
   app.enableCors(corsOptions);
 
+  /* ********************************************** */
+
   // C'est cette ligne qui active la magie de class-validator
   app.useGlobalPipes(
     new ValidationPipe({
@@ -42,10 +69,12 @@ async function bootstrap() {
     }),
   );
 
+  /* ********************************************** */
+
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
 
-  logger.log(`\uf427  App running on port ${port} (internal)`);
+  logger.warn(`\uf427  App running on port ${port} (internal)`);
 }
 bootstrap().catch((err) => {
   console.error(err);
