@@ -60,12 +60,12 @@ export class UsersService {
       throw new Error('Settings object is too large');
     }
 
-    // We use { new: true } to return the updated document
+    // We use { returnDocument: 'after' } to return the updated document
     return this.userModel
       .findByIdAndUpdate(
         userId,
         { $set: { tradingSettings: strategyData } },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec();
   }
