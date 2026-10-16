@@ -1,0 +1,22 @@
+# Fins de ligne : LF partout, y compris dans la copie de travail Windows.
+#
+# La règle vit ici et non dans `core.autocrlf` parce qu'une configuration de
+# machine n'existe ni sur l'autre poste ni sur une CI. `core.autocrlf=true` est
+# le défaut du programme d'installation Git for Windows, posé au niveau
+# *système* : aucun choix de ce dépôt, mais c'est lui qui checkoutait les
+# fichiers en CRLF pendant que prettier (`endOfLine: 'lf'`) les réécrit en LF.
+#
+# Constaté le 2026-10-16 : 43 des 45 fichiers suivis étaient en CRLF sur le
+# disque, et `prettier --list-different` les accusait tous (24 sur 24 en `src/`)
+# sans qu'aucune ligne de code ne diffère.
+#
+# L'index, lui, était déjà en LF (`git ls-files --eol`). Cette règle n'a donc
+# rien renormalisé de l'historique : elle aligne la copie de travail sur ce qui
+# était déjà versionné.
+* text=auto eol=lf
+
+# Un CR résiduel derrière un shebang casse un script shell en silence, et
+# seulement sur la machine qui le lance ; cmd.exe, lui, veut du CRLF.
+*.sh  text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
