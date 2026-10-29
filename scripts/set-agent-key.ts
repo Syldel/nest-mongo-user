@@ -93,7 +93,16 @@ async function bootstrap() {
     console.log(colors.greenText('Encryption round-trip verified'));
 
     const proceed = await promptConfirm('Save to database?', true);
-    if (!proceed) process.exit();
+    if (!proceed) {
+      // Refuser l'enregistrement sortait en silence avec le code 0 : on pouvait
+      // croire la clé enregistrée. Code non nul, puisque rien n'a été fait.
+      console.log(
+        colors.yellowText(
+          'Nothing saved: the agent key in the database is unchanged.',
+        ),
+      );
+      process.exit(1);
+    }
     await usersService.updateAgentKey(userId, encrypted);
     console.log(colors.greenText('Agent key updated successfully'));
     // Le gateway garde les clés déchiffrées 7 jours en mémoire (UserClient) et
