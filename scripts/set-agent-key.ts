@@ -66,27 +66,43 @@ async function bootstrap() {
   if (user) {
     const userId = user._id.toString();
 
+    // Les deux secrets sont masqués à la saisie et ne sont jamais réaffichés :
+    // la clé d'agent signe des ordres sur le compte, et le terminal garde un
+    // historique. micro-clack ≥ 1.0.1 (avant, chaque saisie était même répétée
+    // une fois par invite précédente).
     const agentPrivateKey = await promptText('Enter Agent Private Key', {
+      mask: true,
       validate: (value) =>
         AGENT_KEY_REGEX.test(value) ||
         'Invalid Agent Private Key. Must start with 0x and be 66 characters long (64 hex characters after 0x).',
     });
 
     const masterKey = await promptText('Enter Master Key', {
+      mask: true,
       validate: (value) =>
         HEX64_REGEX.test(value) ||
         'Invalid Master Key. Must be exactly 64 hexadecimal characters.',
     });
 
     const encrypted = AesGcmUtil.encrypt(agentPrivateKey, masterKey);
-    if (await promptConfirm('Try to decrypt?', true)) {
-      console.log(AesGcmUtil.decrypt(encrypted, masterKey));
+    // L'aller-retour se vérifie toujours, par comparaison et sans affichage :
+    // un chiffré illisible enregistré ici ferait refuser tous les ordres.
+    if (AesGcmUtil.decrypt(encrypted, masterKey) !== agentPrivateKey) {
+      throw new Error('Encryption round-trip failed, nothing saved.');
     }
+    console.log(colors.greenText('Encryption round-trip verified'));
 
     const proceed = await promptConfirm('Save to database?', true);
     if (!proceed) process.exit();
     await usersService.updateAgentKey(userId, encrypted);
     console.log(colors.greenText('Agent key updated successfully'));
+    // Le gateway garde les clés déchiffrées 7 jours en mémoire (UserClient) et
+    // personne n'appelle sa synchro : sans redémarrage, il signe avec l'ancienne.
+    console.log(
+      colors.yellowText(
+        'Restart nest-hyperliquid-gateway: it caches decrypted agent keys for 7 days.',
+      ),
+    );
   } else {
     throw new Error('User not found!');
   }
