@@ -19,7 +19,13 @@ export class ServiceScopeGuard implements CanActivate {
       throw new UnauthorizedException('Service not authenticated');
     }
 
-    if (!service?.scope?.includes(this.requiredScope)) {
+    // Le scope vient du JWT, dont rien ne garantit la forme : sur une chaîne,
+    // `includes` cherchait une sous-chaîne et « users:agentKeys » ouvrait la clé
+    // d'agent. Seul un tableau est lu.
+    if (
+      !Array.isArray(service.scope) ||
+      !service.scope.includes(this.requiredScope)
+    ) {
       throw new ForbiddenException('Insufficient service scope');
     }
 
