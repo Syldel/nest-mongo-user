@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { ServiceAuthGuard } from '../auth/service-auth.guard';
 import { ServiceScopeGuard } from '../auth/service-scope.guard';
@@ -48,7 +52,8 @@ describe('InternalUsersController', () => {
   });
 
   describe('getAgentCredentials', () => {
-    const agentKey = { data: 'aa', iv: 'bb', tag: 'cc' };
+    // Un JWE compact tel que `JweUtil.seal` l'écrit : la route ne l'ouvre pas.
+    const agentKey = 'eyJhbGciOiJkaXIifQ..aXY.Y3Q.dGFn';
 
     function controllerReturning(user: unknown) {
       const usersService = {
@@ -57,10 +62,23 @@ describe('InternalUsersController', () => {
       return new InternalUsersController(usersService);
     }
 
-    it('should return the stored encrypted blob as is', async () => {
+    // Un objet et non la chaîne nue : Nest enverrait une chaîne en text/html,
+    // et le gateway lit `response.json()`.
+    it('should return the sealed key as is, inside a JSON object', async () => {
       const controller = controllerReturning({ agentKey });
-      await expect(controller.getAgentCredentials('u1')).resolves.toEqual(
+      await expect(controller.getAgentCredentials('u1')).resolves.toEqual({
         agentKey,
+      });
+    });
+
+    it('should name a key still stored in the crypto-utils 1.x format', async () => {
+      const controller = controllerReturning({
+        agentKey: { data: 'aa', iv: 'bb', tag: 'cc' },
+      });
+      await expect(controller.getAgentCredentials('u1')).rejects.toThrow(
+        new ConflictException(
+          'The stored agent key uses the crypto-utils 1.x format { data, iv, tag }: run set-agent-key again',
+        ),
       );
     });
 

@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import type { AgentKey } from '../auth/interfaces/agent-key.interface';
+import { Document, Schema as MongooseSchema } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -16,8 +15,11 @@ export class User extends Document {
   @Prop({ type: Object, default: {} })
   tradingSettings: Record<string, any>;
 
-  @Prop({ type: Object, select: false })
-  agentKey?: AgentKey;
+  // Un JWE compact depuis crypto-utils 2.0.0, mais le chemin reste `Mixed` :
+  // un objet 1.x encore en base doit se lire tel quel pour être refusé en le
+  // nommant (voir `readStoredAgentKey`), pas disparaître en `undefined`.
+  @Prop({ type: MongooseSchema.Types.Mixed, select: false })
+  agentKey?: unknown;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { isValidObjectId } from 'mongoose';
-import { AesGcmUtil } from '@syldel/crypto-utils';
+import { JweUtil } from '@syldel/crypto-utils';
 import {
   colors,
   promptConfirm,
@@ -10,6 +10,7 @@ import {
 import { AppModule } from '../src/app.module';
 import { UsersService } from '../src/users/users.service';
 import { User } from '../src/users/user.schema';
+import { agentKeyContext } from '../src/users/agent-key';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -17,6 +18,8 @@ async function bootstrap() {
   const HEX64_REGEX = /^[a-fA-F0-9]{64}$/;
   const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
   const AGENT_KEY_REGEX = /^0x[a-fA-F0-9]{64}$/;
+  // Le format que JweUtil accepte pour un identifiant de clé.
+  const KID_REGEX = /^[a-z0-9-]{1,32}$/;
 
   const app = await NestFactory.createApplicationContext(AppModule);
 
@@ -84,13 +87,30 @@ async function bootstrap() {
         'Invalid Master Key. Must be exactly 64 hexadecimal characters.',
     });
 
-    const encrypted = AesGcmUtil.encrypt(agentPrivateKey, masterKey);
+    // Le nom de la clé maîtresse, écrit en clair dans le JWE : le gateway
+    // choisit sa clé par ce nom dans AGENT_ENCRYPTION_KEYS (`kid:hex,...`).
+    const kid = await promptText('Enter Master Key id (kid, e.g. 2026-11)', {
+      validate: (value) =>
+        KID_REGEX.test(value) ||
+        'Invalid key id. Use 1-32 characters among a-z, 0-9 and "-".',
+    });
+
+    // Lié à l'utilisateur : recopié sur un autre, le gateway le refuse.
+    const context = agentKeyContext(userId);
+    const sealed = JweUtil.seal(agentPrivateKey, {
+      kid,
+      key: masterKey,
+      context,
+    });
     // L'aller-retour se vérifie toujours, par comparaison et sans affichage :
     // un chiffré illisible enregistré ici ferait refuser tous les ordres.
-    if (AesGcmUtil.decrypt(encrypted, masterKey) !== agentPrivateKey) {
+    if (
+      JweUtil.open(sealed, { keys: { [kid]: masterKey }, context }) !==
+      agentPrivateKey
+    ) {
       throw new Error('Encryption round-trip failed, nothing saved.');
     }
-    console.log(colors.greenText('Encryption round-trip verified'));
+    console.log(colors.greenText(`Sealed for ${context} with key id "${kid}"`));
 
     const proceed = await promptConfirm('Save to database?', true);
     if (!proceed) {
@@ -103,13 +123,13 @@ async function bootstrap() {
       );
       process.exit(1);
     }
-    await usersService.updateAgentKey(userId, encrypted);
+    await usersService.updateAgentKey(userId, sealed);
     console.log(colors.greenText('Agent key updated successfully'));
     // Le gateway garde les clés déchiffrées 7 jours en mémoire (UserClient) et
     // personne n'appelle sa synchro : sans redémarrage, il signe avec l'ancienne.
     console.log(
       colors.yellowText(
-        'Restart nest-hyperliquid-gateway: it caches decrypted agent keys for 7 days.',
+        `Restart nest-hyperliquid-gateway: it caches decrypted agent keys for 7 days, and AGENT_ENCRYPTION_KEYS must hold "${kid}".`,
       ),
     );
   } else {

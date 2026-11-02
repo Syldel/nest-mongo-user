@@ -3,9 +3,9 @@ import {
   Delete,
   ForbiddenException,
   Get,
-  NotFoundException,
   Param,
 } from '@nestjs/common';
+import { readStoredAgentKey } from './agent-key';
 import { UsersService } from './users.service';
 import { ServiceAccess } from '../auth/service-access.decorator';
 
@@ -35,10 +35,8 @@ export class InternalUsersController {
   async getAgentCredentials(@Param('userId') userId: string) {
     const user = await this.usersService.findByIdWithAgentKey(userId);
 
-    if (!user || !user.agentKey) {
-      throw new NotFoundException('No agent key configured for this user');
-    }
-
-    return user.agentKey;
+    // Un objet JSON et non la chaîne nue : Nest renverrait une chaîne en
+    // text/html, et le gateway lit `response.json()`.
+    return { agentKey: readStoredAgentKey(user?.agentKey) };
   }
 }

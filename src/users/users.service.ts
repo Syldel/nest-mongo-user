@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from './user.schema';
-import { AgentKey } from '../auth/interfaces/agent-key.interface';
+import type { AgentKey } from './agent-key';
 
 export type SafeUser = Omit<User, 'password' | 'agentKey'>;
 
