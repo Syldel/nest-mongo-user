@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  # Une pull request (Dependabot compris) est vérifiée avant sa fusion ; `push`
+  # ne visant que `main`, chaque état n'est contrôlé qu'une fois.
+  pull_request:
+
+# Une poussée qui en suit une autre annule la précédente.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Même ligne de Node qu'en local et qu'en production : .nvmrc fait foi, pas un
+      # numéro recopié ici. Il ne nomme que la majeure : `check-latest` prend le dernier
+      # correctif publié plutôt que celui en cache sur le runner, qui peut être sous le
+      # plancher d'`engines.node` — et `engine-strict` ferait alors échouer `npm ci`.
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+          cache: npm
+
+      # `npm ci` et non `npm install` : il installe le lockfile, exactement.
+      - name: Install dependencies
+        run: npm ci
+
+      # `lint:check` et non `lint` : ce dernier porte `--fix`, donc en CI il
+      # corrigerait puis passerait, quelles que soient les violations.
+      - name: Lint
+        run: npm run lint:check
+
+      # Couvre aussi `scripts/` (set-agent-key), que le build ne compile pas.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # Les tests e2e (`test:e2e`) ne tournent pas ici : ils démarrent l'AppModule
+      # entier, donc une vraie base MongoDB et son change stream, que la CI n'a pas.
+      - name: Build
+        run: npm run build
+
+      # Le Dockerfile lance `node dist/main.js`. Il ne copie que `src/` ; si le
+      # build compile un autre dossier (`scripts/` le faisait avant le
+      # 2026-11-02), TypeScript range tout sous `dist/src/` et ce chemin disparaît
+      # sans aucune erreur.
+      - name: Entry point the image starts
+        run: test -f dist/main.js
