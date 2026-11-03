@@ -94,7 +94,8 @@ describe('Auth e2e', () => {
             .send({
               username,
               walletAddress: `0x${randomHex(20)}`,
-              password: 'password123',
+              // Valide (15 caractères au moins) : seul le nom doit être refusé.
+              password: 'correct horse battery',
             })
             .expect(400);
 

@@ -14,6 +14,17 @@ import {
  * caractères : « é » en vaut deux.
  */
 const BCRYPT_MAX_BYTES = 72;
+
+/**
+ * NIST SP 800-63B-4 : un mot de passe utilisé comme facteur unique « SHALL »
+ * faire au moins 15 caractères, chaque point de code Unicode comptant pour
+ * un (ce que fait `MinLength`, qui compte une paire de substitution comme un
+ * seul caractère). C'est le cas ici : il n'y a pas de second facteur.
+ * Seuls l'inscription et le changement l'imposent ; un mot de passe plus
+ * court créé avant le 2026-11-03 reste valable à la connexion.
+ */
+const PASSWORD_MIN_LENGTH = 15;
+const PASSWORD_TOO_SHORT = `Password must be at least ${PASSWORD_MIN_LENGTH} characters long`;
 const PASSWORD_TOO_LONG = `Password must be at most ${BCRYPT_MAX_BYTES} bytes long`;
 
 export class RegisterDto {
@@ -34,7 +45,7 @@ export class RegisterDto {
   username: string;
 
   @IsString()
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @MinLength(PASSWORD_MIN_LENGTH, { message: PASSWORD_TOO_SHORT })
   @IsByteLength(0, BCRYPT_MAX_BYTES, { message: PASSWORD_TOO_LONG })
   password: string;
 }
@@ -58,7 +69,7 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(PASSWORD_MIN_LENGTH, { message: PASSWORD_TOO_SHORT })
   @IsByteLength(0, BCRYPT_MAX_BYTES, { message: PASSWORD_TOO_LONG })
   newPassword: string;
 

@@ -12,7 +12,7 @@ function rejectedFields(body: Record<string, unknown>): string[] {
 const valid = {
   walletAddress: '0x' + 'aB'.repeat(20),
   username: 'alice_01',
-  password: 'password123',
+  password: 'correct horse battery',
 };
 
 describe('RegisterDto', () => {
@@ -37,10 +37,23 @@ describe('RegisterDto', () => {
     },
   );
 
-  it('should refuse a password under 8 characters', () => {
-    expect(rejectedFields({ ...valid, password: 'short12' })).toEqual([
-      'password',
-    ]);
+  // NIST SP 800-63B-4 : 15 caractères pour un facteur unique.
+  it.each([
+    ['14 characters', 'a'.repeat(14), ['password']],
+    ['15 characters', 'a'.repeat(15), []],
+    // Un point de code compte pour un : 15 emojis font 30 unités UTF-16.
+    ['15 emojis', '🚀'.repeat(15), []],
+    ['14 emojis', '🚀'.repeat(14), ['password']],
+  ])('should treat a password of %s', (_label, password, expected) => {
+    expect(rejectedFields({ ...valid, password })).toEqual(expected);
+  });
+
+  it('should say how long a password must be', () => {
+    const dto = plainToInstance(RegisterDto, { ...valid, password: 'short' });
+    const [error] = validateSync(dto);
+    expect(Object.values(error.constraints ?? {})).toContain(
+      'Password must be at least 15 characters long',
+    );
   });
 });
 
@@ -62,6 +75,25 @@ describe('password length in bytes', () => {
     expect(
       refused(LoginDto, { username: 'alice', password: 'a'.repeat(73) }),
     ).toEqual(['password']);
+  });
+
+  it('should require 15 characters for a new password too', () => {
+    const short = 'a'.repeat(14);
+    expect(
+      refused(ChangePasswordDto, {
+        currentPassword: 'old-password',
+        newPassword: short,
+        confirmPassword: short,
+      }),
+    ).toEqual(['newPassword']);
+  });
+
+  // Une connexion n'impose pas de minimum : un mot de passe d'avant la
+  // règle des 15 caractères doit rester utilisable.
+  it('should accept a short password at sign-in', () => {
+    expect(
+      refused(LoginDto, { username: 'alice', password: 'short-pass' }),
+    ).toEqual([]);
   });
 
   it('should refuse a new password above 72 bytes', () => {
