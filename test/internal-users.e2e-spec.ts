@@ -14,9 +14,8 @@ describe('Internal users (service-to-service)', () => {
   const userId = '7982701baeeaa6a235ae1ec6';
 
   beforeAll(async () => {
-    process.env.JWT_USER_SECRET = 'test-user-secret-at-least-32-bytes-long';
-    process.env.JWT_SERVICE_SECRET =
-      'test-service-secret-at-least-32-bytes-long';
+    process.env.JWT_USER_SECRET = 'a1'.repeat(32);
+    process.env.JWT_SERVICE_SECRET = 'b2'.repeat(32);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],

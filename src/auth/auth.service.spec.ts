@@ -19,7 +19,7 @@ jest.mock('bcrypt', () => {
   };
 });
 
-const SECRET = 'user-secret-for-tests-32-bytes-min';
+const SECRET = 'a1'.repeat(32);
 const PASSWORD = 'correct horse battery';
 
 function usersServiceStub(

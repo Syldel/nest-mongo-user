@@ -5,8 +5,8 @@ import { Request } from 'express';
 import { AuthGuard } from './auth.guard';
 import { ServiceAuthGuard } from './service-auth.guard';
 
-const USER_SECRET = 'user-secret-for-tests-32-bytes-min';
-const SERVICE_SECRET = 'service-secret-for-tests-32-bytes-min';
+const USER_SECRET = 'a1'.repeat(32);
+const SERVICE_SECRET = 'b2'.repeat(32);
 
 function httpContext(request: Partial<Request>): ExecutionContext {
   return {

@@ -33,12 +33,13 @@ Create a .env file in the root directory:
 ```
 PORT=3000
 MONGO_URI=mongodb://localhost:27017/nest-mongo-user
-JWT_USER_SECRET=your_generated_hex_secret
-JWT_SERVICE_SECRET=super-secret-service
+JWT_USER_SECRET=<64 hex characters>
+JWT_SERVICE_SECRET=<64 hex characters, another one>
 JWT_EXPIRES_IN=1h
 ```
 
-Generate a secure JWT Secret:
+Generate each JWT secret with the command below. The service refuses to start unless both are exactly
+64 hex characters: a passphrase can be guessed offline from any token a user receives.
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
