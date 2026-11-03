@@ -28,7 +28,9 @@ function unsignedToken(payload: object): string {
 // Les gardes reçoivent le JwtService de leur module, mais passent toujours leur
 // propre secret à `verifyAsync` : on leur donne ici un JwtService sans secret
 // par défaut, pour qu'aucun repli silencieux ne fasse passer un test.
-const jwt = new JwtService();
+const jwt = new JwtService({ signOptions: { expiresIn: 60 } });
+// Signe sans `exp`, comme le bot le faisait pour ses jetons de service.
+const jwtWithoutExpiry = new JwtService();
 const config = {
   get: (key: string) =>
     ({ JWT_USER_SECRET: USER_SECRET, JWT_SERVICE_SECRET: SERVICE_SECRET })[key],
@@ -95,6 +97,13 @@ describe('AuthGuard (user tokens)', () => {
     );
   });
 
+  it('should refuse a token without expiry', async () => {
+    const token = jwtWithoutExpiry.sign(userPayload, { secret: USER_SECRET });
+    await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
   it('should refuse an unsigned alg:none token', async () => {
     const token = unsignedToken(userPayload);
     await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
@@ -150,6 +159,17 @@ describe('ServiceAuthGuard (service tokens)', () => {
       secret: SERVICE_SECRET,
       expiresIn: -10,
     });
+    await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  // Le jeton `users:read` du bot, signé sans `exp` jusqu'au 2026-11-03.
+  it('should refuse a service token without expiry', async () => {
+    const token = jwtWithoutExpiry.sign(
+      { sub: 'nest-trading-bot', scope: ['users:read'] },
+      { secret: SERVICE_SECRET },
+    );
     await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
       UnauthorizedException,
     );

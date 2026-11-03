@@ -16,8 +16,14 @@ services (relevé dans le code le 2026-11-03) :
 | `JWT_SERVICE_SECRET` | nest-mongo-user, gateway, bot | gateway (`users:read`, `users:agentKey`), bot (`users:read`), nest-mongo-user (webhook, sans scope)                                | nest-mongo-user (`ServiceAuthGuard` puis `ServiceScopeGuard`), gateway et bot (synchro) |
 
 Le scope est **déclaré par l'émetteur** dans le jeton, et `ServiceScopeGuard` ne fait que le
-lire. Les routes de synchro du gateway et du bot acceptent tout jeton de service valide, quel
-que soit son `sub`.
+lire. Les routes de synchro du gateway et du bot n'acceptent, depuis le 2026-11-03, que le
+jeton du webhook de nest-mongo-user (`sub: "nest-mongo-user"`, `exp` exigé) : cela empêche d'y
+rejouer le jeton d'un autre service, pas d'en forger un, puisque le secret est partagé.
+
+Tout jeton sans `exp` est refusé, par les deux gardes de ce service comme par les routes de
+synchro : `jsonwebtoken` et `PureJwtUtil` ne contrôlent `exp` que s'il est présent, et le bot
+signait ses jetons `users:read` sans, si bien qu'ils n'expiraient jamais (mesuré, corrigé le
+2026-11-03).
 
 ## Ce que la règle établie demande
 
@@ -48,7 +54,8 @@ et fabrique un jeton `users:agentKey` pour lire les clés d'agent. Dans cette ar
   le même VPS, et qui prend l'hôte prend tout.
 
 Le seul effet réel du partage, en dehors de ce scénario : n'importe lequel des trois peut
-déclencher la synchro des deux autres. Le coût en est une relecture des utilisateurs, borné.
+forger le jeton du webhook et déclencher la synchro des deux autres. Le coût en est une
+relecture des utilisateurs, bornée, sans appel à Hyperliquid.
 
 À l'inverse, la correction complète touche les trois dépôts : un secret (ou une paire de clés)
 par émetteur, choisi par `kid`, la liste des scopes autorisés par émetteur dans
@@ -71,8 +78,12 @@ publique (EdDSA ou ES256), la clé privée chez nest-mongo-user seul, un `iss` p
 les jetons qu'il émet ; pour les services, un secret par émetteur et des scopes accordés par
 nest-mongo-user, jamais lus dans le jeton.
 
-## Observé en écrivant cette note
+## Observé en écrivant cette note, et corrigé
 
-`scripts/generate-service-token.ts` signe `{ service: 'nest-trading-bot', scope }` et non
-`sub` : `ServiceAuthGuard` en tire un `id` indéfini. Sans conséquence de sécurité (le scope
-reste vérifié), mais un jeton de test qui ne ressemble pas à ceux des services.
+- `scripts/generate-service-token.ts` signait `{ service: 'nest-trading-bot', scope }` au lieu
+  de `sub`, et affichait dans le terminal un jeton `users:read` valable une heure. Inutilisé
+  depuis sa création le 2026-02-06 : supprimé le 2026-11-03. Les tests ont leurs propres jetons
+  (`test/helpers/jwt.helper.ts`).
+- Les routes de synchro journalisaient tout échec, y compris celui de la synchro elle-même,
+  comme « Security alert: Unauthorized sync attempt » avec un 401. La vérification du jeton est
+  désormais séparée du travail.

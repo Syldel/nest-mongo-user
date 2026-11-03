@@ -32,6 +32,12 @@ export class AuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Invalid token');
     }
+    // jsonwebtoken ne contrôle `exp` que s'il est présent : un jeton signé
+    // sans (le bot le faisait pour ses jetons de service jusqu'au 2026-11-03)
+    // n'expirait jamais.
+    if (typeof payload.exp !== 'number') {
+      throw new UnauthorizedException('Invalid token');
+    }
 
     request.user = {
       id: payload.sub,

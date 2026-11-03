@@ -33,6 +33,12 @@ export class ServiceAuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Invalid service token');
     }
+    // jsonwebtoken ne contrôle `exp` que s'il est présent : un jeton signé
+    // sans (le bot le faisait pour ses jetons de service jusqu'au 2026-11-03)
+    // n'expirait jamais.
+    if (typeof payload.exp !== 'number') {
+      throw new UnauthorizedException('Invalid service token');
+    }
 
     request.service = {
       id: payload.sub,
