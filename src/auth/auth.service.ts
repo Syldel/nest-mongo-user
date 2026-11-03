@@ -12,6 +12,16 @@ import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 import { User } from '../users/user.schema';
 
+/**
+ * Un hash bcrypt de coût 10 (comme `register`), d'une valeur aléatoire jetée :
+ * comparé quand le compte n'existe pas, pour que la réponse prenne le même
+ * temps. Sans lui, un compte inconnu répondait sans calcul bcrypt, nettement
+ * plus vite, et le temps de réponse disait quels comptes existent (le
+ * « quick exit » de la fiche Authentication de l'OWASP).
+ */
+const DUMMY_PASSWORD_HASH =
+  '$2b$10$WlWxyjR8BfUqC4rACuwY0useR8uuw7axbmMhHzjjXpHbyqrwgdtCu';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -58,7 +68,12 @@ export class AuthService {
       );
     }
 
-    if (user && (await bcrypt.compare(dto.password, user.password))) {
+    // Toujours une comparaison bcrypt, compte connu ou non : voir DUMMY_PASSWORD_HASH.
+    const passwordMatches = await bcrypt.compare(
+      dto.password,
+      user?.password ?? DUMMY_PASSWORD_HASH,
+    );
+    if (user && passwordMatches) {
       const payload: JwtUserPayload = {
         sub: user._id.toString(),
         wallet: user.walletAddress,

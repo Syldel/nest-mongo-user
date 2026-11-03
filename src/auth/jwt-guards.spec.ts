@@ -5,8 +5,8 @@ import { Request } from 'express';
 import { AuthGuard } from './auth.guard';
 import { ServiceAuthGuard } from './service-auth.guard';
 
-const USER_SECRET = 'user-secret-for-tests';
-const SERVICE_SECRET = 'service-secret-for-tests';
+const USER_SECRET = 'user-secret-for-tests-32-bytes-min';
+const SERVICE_SECRET = 'service-secret-for-tests-32-bytes-min';
 
 function httpContext(request: Partial<Request>): ExecutionContext {
   return {
@@ -83,6 +83,18 @@ describe('AuthGuard (user tokens)', () => {
     );
   });
 
+  // Le bon secret, mais un autre algorithme HMAC : jsonwebtoken l'acceptait
+  // sans liste explicite (RFC 8725 §3.1).
+  it('should refuse a token signed with HS384, even with the right secret', async () => {
+    const token = jwt.sign(userPayload, {
+      secret: USER_SECRET,
+      algorithm: 'HS384',
+    });
+    await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
   it('should refuse an unsigned alg:none token', async () => {
     const token = unsignedToken(userPayload);
     await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
@@ -93,6 +105,16 @@ describe('AuthGuard (user tokens)', () => {
 
 describe('ServiceAuthGuard (service tokens)', () => {
   const guard = new ServiceAuthGuard(jwt, config);
+
+  it('should refuse a token signed with HS512, even with the right secret', async () => {
+    const token = jwt.sign(servicePayload, {
+      secret: SERVICE_SECRET,
+      algorithm: 'HS512',
+    });
+    await expect(guard.canActivate(httpContext(bearer(token)))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
 
   it('should put the service identity and scope on the request', async () => {
     const token = jwt.sign(servicePayload, { secret: SERVICE_SECRET });

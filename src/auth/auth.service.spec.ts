@@ -9,7 +9,17 @@ import { User } from '../users/user.schema';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 
-const SECRET = 'user-secret-for-tests';
+// `compare` est observé sans être remplacé : un espion posé sur l'import du
+// spec ne verrait pas les appels du service, qui a sa propre copie du module.
+jest.mock('bcrypt', () => {
+  const actual = jest.requireActual<typeof bcrypt>('bcrypt');
+  return {
+    ...actual,
+    compare: jest.fn().mockImplementation(actual.compare),
+  };
+});
+
+const SECRET = 'user-secret-for-tests-32-bytes-min';
 const PASSWORD = 'correct horse battery';
 
 function usersServiceStub(
@@ -35,6 +45,7 @@ function serviceWith(users: ReturnType<typeof usersServiceStub>) {
 
 describe('AuthService', () => {
   let storedHash: string;
+  afterEach(() => jest.clearAllMocks());
   beforeAll(async () => {
     storedHash = await bcrypt.hash(PASSWORD, 4);
   });
@@ -129,6 +140,28 @@ describe('AuthService', () => {
       await expect(
         serviceWith(users).login({ username: 'alice', password: pwd }),
       ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
+    });
+
+    // Un compte inconnu doit coûter un calcul bcrypt, au même coût qu'un vrai
+    // hash : sans lui, il répondait plus vite et le temps disait quels comptes
+    // existent.
+    it('should run bcrypt at the register cost even for an unknown account', async () => {
+      const users = usersServiceStub();
+      await expect(
+        serviceWith(users).login({ username: 'ghost', password: PASSWORD }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      const compare = bcrypt.compare as unknown as jest.Mock;
+      expect(compare).toHaveBeenCalledTimes(1);
+      const [, hash] = compare.mock.calls[0] as [string, string];
+
+      await serviceWith(users).register({
+        walletAddress: '0x' + 'a'.repeat(40),
+        username: 'alice',
+        password: PASSWORD,
+      });
+      const [[created]] = users.create.mock.calls as Partial<User>[][];
+      expect(bcrypt.getRounds(hash)).toBe(bcrypt.getRounds(created.password!));
     });
 
     it('should refuse a login naming neither a username nor a wallet', async () => {

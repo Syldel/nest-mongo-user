@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { JWT_ALGORITHM } from './jwt-secret';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 
 @Injectable()
@@ -26,6 +27,7 @@ export class AuthGuard implements CanActivate {
     try {
       payload = await this.jwtService.verifyAsync<JwtUserPayload>(token, {
         secret: this.configService.get<string>('JWT_USER_SECRET'),
+        algorithms: [JWT_ALGORITHM],
       });
     } catch {
       throw new UnauthorizedException('Invalid token');

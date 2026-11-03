@@ -1,5 +1,20 @@
 import { Transform } from 'class-transformer';
-import { IsString, MinLength, Matches, ValidateIf } from 'class-validator';
+import {
+  IsByteLength,
+  IsString,
+  MinLength,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
+
+/**
+ * bcrypt ne lit que les 72 premiers octets : au-delà, deux mots de passe qui
+ * ne diffèrent qu'après ce seuil ouvrent le même compte. La fiche Password
+ * Storage de l'OWASP demande d'imposer ce maximum. En octets UTF-8, pas en
+ * caractères : « é » en vaut deux.
+ */
+const BCRYPT_MAX_BYTES = 72;
+const PASSWORD_TOO_LONG = `Password must be at most ${BCRYPT_MAX_BYTES} bytes long`;
 
 export class RegisterDto {
   @IsString()
@@ -20,6 +35,7 @@ export class RegisterDto {
 
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @IsByteLength(0, BCRYPT_MAX_BYTES, { message: PASSWORD_TOO_LONG })
   password: string;
 }
 
@@ -33,6 +49,7 @@ export class LoginDto {
   username?: string;
 
   @IsString()
+  @IsByteLength(0, BCRYPT_MAX_BYTES, { message: PASSWORD_TOO_LONG })
   password: string;
 }
 
@@ -42,6 +59,7 @@ export class ChangePasswordDto {
 
   @IsString()
   @MinLength(8)
+  @IsByteLength(0, BCRYPT_MAX_BYTES, { message: PASSWORD_TOO_LONG })
   newPassword: string;
 
   @IsString()

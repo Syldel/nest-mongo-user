@@ -24,8 +24,9 @@ describe('Auth e2e', () => {
   let serviceToken: string;
 
   beforeAll(async () => {
-    process.env.JWT_USER_SECRET = 'test-user-secret';
-    process.env.JWT_SERVICE_SECRET = 'test-service-secret';
+    process.env.JWT_USER_SECRET = 'test-user-secret-at-least-32-bytes-long';
+    process.env.JWT_SERVICE_SECRET =
+      'test-service-secret-at-least-32-bytes-long';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],

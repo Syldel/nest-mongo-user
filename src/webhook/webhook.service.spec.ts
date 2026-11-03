@@ -3,7 +3,7 @@ import { PureJwtUtil } from '@syldel/crypto-utils';
 import { HttpClientService } from '../utils/http-client.service';
 import { WebhookService } from './webhook.service';
 
-const SECRET = 'service-secret-for-tests';
+const SECRET = 'service-secret-for-tests-32-bytes-min';
 
 function serviceWith(targets: string, request: jest.Mock) {
   const config = {

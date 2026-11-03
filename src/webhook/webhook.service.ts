@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PureJwtUtil } from '@syldel/crypto-utils';
 import { HttpClientService } from '../utils/http-client.service';
+import { requireJwtSecret } from '../auth/jwt-secret';
 
 @Injectable()
 export class WebhookService {
@@ -19,7 +20,10 @@ export class WebhookService {
       .split(',')
       .map((u) => u.trim())
       .filter((u) => u.length > 0);
-    this.jwtSecret = this.configService.get<string>('JWT_SERVICE_SECRET') || '';
+    this.jwtSecret = requireJwtSecret(
+      'JWT_SERVICE_SECRET',
+      this.configService.get<string>('JWT_SERVICE_SECRET'),
+    );
   }
 
   notifyAll(): void {
