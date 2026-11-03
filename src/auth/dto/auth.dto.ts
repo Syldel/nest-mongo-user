@@ -11,7 +11,8 @@ import {
  * bcrypt ne lit que les 72 premiers octets : au-delà, deux mots de passe qui
  * ne diffèrent qu'après ce seuil ouvrent le même compte. La fiche Password
  * Storage de l'OWASP demande d'imposer ce maximum. En octets UTF-8, pas en
- * caractères : « é » en vaut deux.
+ * caractères : « é » en vaut deux. Argon2id lèvera cette limite : prévu, sans
+ * urgence, voir docs/password-hashing.md.
  */
 const BCRYPT_MAX_BYTES = 72;
 

@@ -85,6 +85,9 @@ Service tokens share one secret between the three services, and a service token 
 scopes. This is a known, deliberate gap: see [docs/service-tokens.md](docs/service-tokens.md) for why
 it stays for now, and when it must be revisited.
 
+Passwords are hashed with bcrypt (cost 10), capped at 72 bytes. Moving to Argon2id is planned, without
+urgency: see [docs/password-hashing.md](docs/password-hashing.md) for why not now, and what would make it urgent.
+
 📦 Production Build
 
 ```bash
