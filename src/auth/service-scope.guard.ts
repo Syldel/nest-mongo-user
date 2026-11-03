@@ -7,6 +7,13 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 
+/**
+ * ⚠️ Le scope est celui que l'émetteur a écrit dans son jeton, et le secret
+ * de service est partagé par les trois services : tout détenteur peut signer
+ * n'importe quel scope. Décision de le garder pour l'instant, et les cas où
+ * elle ne tient plus : docs/service-tokens.md. À relire avant d'ajouter un
+ * scope ou un service.
+ */
 @Injectable()
 export class ServiceScopeGuard implements CanActivate {
   constructor(private requiredScope: string) {}

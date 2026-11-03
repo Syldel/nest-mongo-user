@@ -81,6 +81,10 @@ Type Safety: Custom AuthGuard and Request interfaces ensure no any types are use
 
 Validation: Wallet addresses are validated via Regex (/^0x[a-fA-F0-9]{40}$/).
 
+Service tokens share one secret between the three services, and a service token carries its own
+scopes. This is a known, deliberate gap: see [docs/service-tokens.md](docs/service-tokens.md) for why
+it stays for now, and when it must be revisited.
+
 📦 Production Build
 
 ```bash
