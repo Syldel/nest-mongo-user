@@ -8,6 +8,12 @@ import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import {
+  LoginThrottle,
+  LoginThrottleSchema,
+} from './login-throttle/login-throttle.schema';
+import { LoginThrottleService } from './login-throttle/login-throttle.service';
 
 @Module({
   imports: [
@@ -32,9 +38,12 @@ import { UsersModule } from '../users/users.module';
       },
     }),
     UsersModule,
+    MongooseModule.forFeature([
+      { name: LoginThrottle.name, schema: LoginThrottleSchema },
+    ]),
   ],
-  providers: [AuthService, AuthGuard],
-  exports: [JwtModule],
+  providers: [AuthService, AuthGuard, LoginThrottleService],
+  exports: [JwtModule, LoginThrottleService],
   controllers: [AuthController],
 })
 export class AuthModule {}

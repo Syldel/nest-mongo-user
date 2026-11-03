@@ -7,14 +7,17 @@ import {
   Req,
   Patch,
   ForbiddenException,
+  UseFilters,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
 import { AuthGuard } from './auth.guard';
+import { LoginThrottledFilter } from './login-throttle/login-throttled.filter';
 
 @Controller('auth')
+@UseFilters(LoginThrottledFilter)
 export class AuthController {
   constructor(
     private authService: AuthService,

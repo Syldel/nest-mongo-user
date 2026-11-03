@@ -11,6 +11,7 @@ import { UsersService } from '../users/users.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 import { User } from '../users/user.schema';
+import { LoginThrottleService } from './login-throttle/login-throttle.service';
 
 /**
  * Un hash bcrypt de coût 10 (comme `register`), d'une valeur aléatoire jetée :
@@ -27,6 +28,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private loginThrottle: LoginThrottleService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -58,21 +60,32 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     let user: User | null;
+    let typedId: string;
     if (dto.username) {
       user = await this.usersService.findOneByUsernameForAuth(dto.username);
+      typedId = `username:${dto.username.trim().toLowerCase()}`;
     } else if (dto.walletAddress) {
       user = await this.usersService.findOneByWalletForAuth(dto.walletAddress);
+      typedId = `wallet:${dto.walletAddress.trim().toLowerCase()}`;
     } else {
       throw new BadRequestException(
         'username or walletAddress must be provided',
       );
     }
 
+    // Un compteur par compte, que l'on se connecte par nom ou par wallet : deux
+    // compteurs auraient doublé les essais. Un identifiant inconnu a le sien,
+    // limité pareil, pour que rien ne dise si le compte existe.
+    const key = user ? `account:${user._id.toString()}` : typedId;
+
     // Toujours une comparaison bcrypt, compte connu ou non : voir DUMMY_PASSWORD_HASH.
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      user?.password ?? DUMMY_PASSWORD_HASH,
-    );
+    const passwordMatches = await this.loginThrottle.attempt(key, async () => {
+      const matches = await bcrypt.compare(
+        dto.password,
+        user?.password ?? DUMMY_PASSWORD_HASH,
+      );
+      return user !== null && matches;
+    });
     if (user && passwordMatches) {
       const payload: JwtUserPayload = {
         sub: user._id.toString(),
@@ -100,7 +113,12 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    // Vérifier le mot de passe actuel est une tentative d'authentification :
+    // sans limitation, un jeton volé servirait à le deviner.
+    const isMatch = await this.loginThrottle.attempt(
+      `account:${user._id.toString()}`,
+      () => bcrypt.compare(currentPassword, user.password),
+    );
     if (!isMatch) {
       throw new UnauthorizedException('Invalid current password');
     }

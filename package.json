@@ -23,7 +23,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "set:agent-key": "ts-node --files scripts/set-agent-key.ts"
+    "set:agent-key": "ts-node --files scripts/set-agent-key.ts",
+    "unlock:login": "ts-node --files scripts/unlock-login.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.16",

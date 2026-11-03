@@ -8,6 +8,11 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../users/user.schema';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import {
+  LoginThrottledError,
+  LoginThrottleService,
+} from './login-throttle/login-throttle.service';
+import { inMemoryLoginThrottleModel } from '../testing/in-memory-login-throttle-model';
 
 // `compare` est observé sans être remplacé : un espion posé sur l'import du
 // spec ne verrait pas les appels du service, qui a sa propre copie du module.
@@ -36,10 +41,14 @@ function usersServiceStub(
   };
 }
 
-function serviceWith(users: ReturnType<typeof usersServiceStub>) {
+function serviceWith(
+  users: ReturnType<typeof usersServiceStub>,
+  throttle = new LoginThrottleService(inMemoryLoginThrottleModel().model),
+) {
   return new AuthService(
     users as unknown as UsersService,
     new JwtService({ secret: SECRET }),
+    throttle,
   );
 }
 
@@ -171,9 +180,99 @@ describe('AuthService', () => {
     });
   });
 
+  /**
+   * La limitation vue depuis le login : un compteur par compte, partagé par
+   * le nom et le wallet, et le même comportement pour un compte inconnu.
+   */
+  describe('login throttling', () => {
+    const account = {
+      _id: { toString: () => 'user-1' },
+      walletAddress: '0x' + 'a'.repeat(40),
+      username: 'alice',
+      password: '',
+    };
+    beforeEach(() => {
+      account.password = storedHash;
+    });
+
+    const outcome = (promise: Promise<unknown>) =>
+      promise.then(
+        () => 'ok',
+        (e: Error) => e.name,
+      );
+
+    async function sixthOutcome(
+      service: AuthService,
+      dto: { username?: string; walletAddress?: string },
+    ) {
+      for (let i = 0; i < 5; i++) {
+        await outcome(service.login({ ...dto, password: 'wrong password' }));
+      }
+      return outcome(service.login({ ...dto, password: 'wrong password' }));
+    }
+
+    // Si un compte inconnu n'était pas limité, le sixième essai dirait si le
+    // compte existe : 401 pour l'un, 429 pour l'autre.
+    it('should throttle an unknown account exactly like a known one', async () => {
+      const known = serviceWith(
+        usersServiceStub({
+          findOneByUsernameForAuth: jest.fn().mockResolvedValue(account),
+        }),
+      );
+      const unknown = serviceWith(usersServiceStub());
+
+      await expect(sixthOutcome(known, { username: 'alice' })).resolves.toBe(
+        'LoginThrottledError',
+      );
+      await expect(sixthOutcome(unknown, { username: 'ghost' })).resolves.toBe(
+        'LoginThrottledError',
+      );
+    });
+
+    it('should share one counter between the username and the wallet of an account', async () => {
+      const service = serviceWith(
+        usersServiceStub({
+          findOneByUsernameForAuth: jest.fn().mockResolvedValue(account),
+          findOneByWalletForAuth: jest.fn().mockResolvedValue(account),
+        }),
+      );
+      for (let i = 0; i < 5; i++) {
+        await outcome(
+          service.login({ username: 'alice', password: 'wrong password' }),
+        );
+      }
+
+      await expect(
+        outcome(
+          service.login({
+            walletAddress: account.walletAddress,
+            password: PASSWORD,
+          }),
+        ),
+      ).resolves.toBe('LoginThrottledError');
+    });
+
+    it('should refuse even the right password during a wait', async () => {
+      const service = serviceWith(
+        usersServiceStub({
+          findOneByUsernameForAuth: jest.fn().mockResolvedValue(account),
+        }),
+      );
+      await sixthOutcome(service, { username: 'alice' });
+
+      await expect(
+        outcome(service.login({ username: 'alice', password: PASSWORD })),
+      ).resolves.toBe('LoginThrottledError');
+    });
+  });
+
   describe('changePassword', () => {
     function storedUser() {
-      return { password: storedHash, save: jest.fn().mockResolvedValue({}) };
+      return {
+        _id: { toString: () => 'user-1' },
+        password: storedHash,
+        save: jest.fn().mockResolvedValue({}),
+      };
     }
 
     it('should save a hash of the new password', async () => {
@@ -210,6 +309,28 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
       expect(user.save).not.toHaveBeenCalled();
       expect(user.password).toBe(storedHash);
+    });
+
+    // Un jeton volé ne doit pas servir à deviner le mot de passe actuel.
+    it('should throttle wrong current passwords like failed sign-ins', async () => {
+      const user = storedUser();
+      const service = serviceWith(
+        usersServiceStub({
+          findByIdForAuth: jest.fn().mockResolvedValue(user),
+        }),
+      );
+      const dto = {
+        currentPassword: 'not the password',
+        newPassword: 'brand new password',
+        confirmPassword: 'brand new password',
+      };
+      for (let i = 0; i < 5; i++) {
+        await service.changePassword('u1', dto).catch(() => undefined);
+      }
+
+      await expect(service.changePassword('u1', dto)).rejects.toThrow(
+        LoginThrottledError,
+      );
     });
 
     it('should refuse a confirmation that differs', async () => {
