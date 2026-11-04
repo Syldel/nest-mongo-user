@@ -33,7 +33,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/platform-express": "^11.1.16",
-    "@syldel/crypto-utils": "^3.0.0",
+    "@syldel/crypto-utils": "^3.0.1",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
