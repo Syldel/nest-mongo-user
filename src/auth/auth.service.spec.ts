@@ -16,6 +16,12 @@ import { inMemoryLoginThrottleModel } from '../testing/in-memory-login-throttle-
 
 // `compare` est observé sans être remplacé : un espion posé sur l'import du
 // spec ne verrait pas les appels du service, qui a sa propre copie du module.
+//
+// Le vrai bcrypt reste chargé, binaire natif compris : ce spec est donc ce qui
+// prouve, à chaque CI, que ce binaire se charge et hache. Depuis le 2026-11-04,
+// le script d'installation de bcrypt est refusé (`allowScripts`) : plus aucune
+// compilation de secours, seul le binaire préconstruit du paquet compte. Sans
+// lui, ce spec tombe en « No native build was found » (éprouvé en le masquant).
 jest.mock('bcrypt', () => {
   const actual = jest.requireActual<typeof bcrypt>('bcrypt');
   return {

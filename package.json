@@ -86,6 +86,7 @@
     "testEnvironment": "node"
   },
   "allowScripts": {
-    "unrs-resolver": false
+    "unrs-resolver": false,
+    "bcrypt": false
   }
 }
