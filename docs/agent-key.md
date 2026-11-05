@@ -16,6 +16,14 @@ Pourquoi : un agent expiré se découvrait par un refus ambigu de l'exchange, au
 (`User or API Wallet 0x… does not exist.`, 2026-10-29), message que la doc officielle donne aussi
 pour une signature fausse. Ces données sont **déclarées** à la saisie, pas lues chez Hyperliquid.
 
+Ce refus-là s'explique très probablement par l'expiration : l'ancien agent (0x1817…2d17) aurait
+été créé le 2026-04-30 (souvenir de l'utilisateur, pas un enregistrement), et 180 jours mènent au
+2026-10-27, entre une mesure acceptée ce jour-là et le refus du 29. Le 2026-11-05, l'agent
+`winter_26-27_key` enregistré par ce script a signé un ordre accepté par l'exchange (refusé
+ensuite pour marge insuffisante, ce qui ne remet pas la signature en cause). Le déroulé :
+`nest-trading-bot/docs/hyperliquid/live-check.md`, « L'agent expiré, puis la première signature
+du nouveau ».
+
 ## Qui s'en sert
 
 - **`/auth/me`** les renvoie (le sous-document n'est pas en `select: false`, la clé si) : le
