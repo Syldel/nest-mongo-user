@@ -14,7 +14,12 @@ import { UsersService } from './users.service';
  * de service, puis les scopes exigés, dans l'ordre.
  */
 function routeAccess(method: keyof InternalUsersController) {
-  const handler: unknown = InternalUsersController.prototype[method];
+  // Par le descripteur, pas par `prototype[method]` : la méthode n'est jamais
+  // appelée, et typescript-eslint ≥ 8.72 signale cet accès (`unbound-method`).
+  const handler: unknown = Object.getOwnPropertyDescriptor(
+    InternalUsersController.prototype,
+    method,
+  )?.value;
   const guards = (Reflect.getMetadata(GUARDS_METADATA, handler as object) ??
     []) as unknown[];
   return {

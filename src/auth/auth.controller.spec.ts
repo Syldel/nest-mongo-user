@@ -6,25 +6,34 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 
-function guardsOf(handler: (...args: never[]) => unknown): unknown[] {
-  return (Reflect.getMetadata(GUARDS_METADATA, handler) ?? []) as unknown[];
+/**
+ * Les gardes posés sur une route. La méthode est lue par son descripteur et
+ * jamais appelée : seule la fonction porte les métadonnées. L'accès direct
+ * `AuthController.prototype[method]` est signalé par `unbound-method` depuis
+ * typescript-eslint 8.72, qui ne peut pas savoir que rien ne l'appelle.
+ */
+function guardsOf(method: keyof AuthController): unknown[] {
+  const handler: unknown = Object.getOwnPropertyDescriptor(
+    AuthController.prototype,
+    method,
+  )?.value;
+  return (Reflect.getMetadata(GUARDS_METADATA, handler as object) ??
+    []) as unknown[];
 }
 
 describe('AuthController', () => {
-  const proto = AuthController.prototype;
-
   describe('route protection', () => {
     it.each(['changePassword', 'getProfile', 'updateMyStrategy'] as const)(
       'should require a user token on %s',
       (method) => {
-        expect(guardsOf(proto[method])).toEqual([AuthGuard]);
+        expect(guardsOf(method)).toEqual([AuthGuard]);
       },
     );
 
     it.each(['register', 'login'] as const)(
       'should leave %s open',
       (method) => {
-        expect(guardsOf(proto[method])).toEqual([]);
+        expect(guardsOf(method)).toEqual([]);
       },
     );
   });
