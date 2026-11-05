@@ -14,6 +14,7 @@ import { agentKeyContext } from '../src/users/agent-key';
 import {
   DASHBOARD_FORMAT_HINT,
   describeValidUntil,
+  masterWalletRefusal,
   parseDashboardValidUntil,
   resolveTimeZone,
   validateAgentName,
@@ -91,6 +92,13 @@ async function bootstrap() {
     // celle de la page API attrape une clé collée par erreur (un autre agent,
     // une clé tronquée qui reste au bon format).
     const agentAddress = EthAddressUtil.fromPrivateKey(agentPrivateKey);
+    // Avant toute question : la clé du wallet maître ne s'enregistre jamais,
+    // même si l'adresse affichée était confirmée par erreur.
+    const masterRefusal = masterWalletRefusal(agentAddress, user.walletAddress);
+    if (masterRefusal) {
+      console.log(colors.redText(`Nothing saved: ${masterRefusal}`));
+      process.exit(1);
+    }
     console.log(
       colors.cyanText(`Agent address derived from this key: ${agentAddress}`),
     );

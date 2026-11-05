@@ -58,14 +58,18 @@ tranchera : il renvoie `validUntil` en entier, d'unité non documentée.
 
 1. choisir l'utilisateur ;
 2. coller la clé privée de l'agent (saisie masquée, jamais réaffichée) ;
-3. **comparer l'adresse affichée** à celle de la page API : sinon rien n'est enregistré ;
-4. saisir le nom, le fuseau du navigateur (Entrée : celui de la machine), puis « Valid Until »
+3. si l'adresse dérivée est celle **du wallet maître** de l'utilisateur, le script s'arrête
+   sans rien enregistrer : c'est la clé maîtresse collée à la place de celle d'un agent (le
+   gateway la refuse aussi avant de signer) ;
+4. **comparer l'adresse affichée** à celle de la page API : sinon rien n'est enregistré ;
+5. saisir le nom, le fuseau du navigateur (Entrée : celui de la machine), puis « Valid Until »
    recopié tel quel ;
-5. **relire la date en toutes lettres** (« Tuesday 4 May 2027, 13:00:28 Europe/Paris = …Z UTC,
+6. **relire la date en toutes lettres** (« Tuesday 4 May 2027, 13:00:28 Europe/Paris = …Z UTC,
    in 180.0 days ») et confirmer : c'est le seul contrôle d'une inversion jour/mois qui reste
    dans les 180 jours ;
-6. clé maîtresse et `kid`, scellement, aller-retour vérifié, confirmation, enregistrement ;
-7. redémarrer le gateway, qui garde les clés en cache sept jours.
+7. clé de chiffrement (l'invite « Master Key », sans rapport avec le wallet maître) et `kid`,
+   scellement, aller-retour vérifié, confirmation, enregistrement ;
+8. redémarrer le gateway, qui garde les clés en cache sept jours.
 
 Refusés à la saisie, en le nommant : un autre format, une date qui n'existe pas (31/02, l'heure
 sautée au passage à l'heure d'été), une heure ambiguë (celle qui se répète en octobre), une date

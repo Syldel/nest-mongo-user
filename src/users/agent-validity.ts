@@ -240,3 +240,20 @@ function sameFields(a: Fields, b: Fields): boolean {
     a.second === b.second
   );
 }
+
+/**
+ * Refuse la clé du **wallet maître** collée à la place de celle d'un agent.
+ * Elle passerait tous les autres contrôles (format, adresse dérivée) et
+ * signerait ensuite les ordres, avec des pouvoirs qu'un agent n'a pas :
+ * retraits, transferts, approbation d'agents. Comparé en minuscules : la base
+ * garde l'adresse du wallet en minuscules, la dérivation la rend en EIP-55.
+ */
+export function masterWalletRefusal(
+  agentAddress: string,
+  masterWalletAddress: string,
+): string | null {
+  if (agentAddress.toLowerCase() !== masterWalletAddress.toLowerCase()) {
+    return null;
+  }
+  return `This key belongs to the master wallet ${masterWalletAddress}, not to an API wallet: never store it. Generate an API wallet on Hyperliquid's API page and paste its key.`;
+}

@@ -1,5 +1,6 @@
 import {
   describeValidUntil,
+  masterWalletRefusal,
   parseDashboardValidUntil,
   resolveTimeZone,
   validateAgentName,
@@ -226,5 +227,23 @@ describe('resolveTimeZone', () => {
         3_600_000,
       );
     }
+  });
+});
+
+describe('masterWalletRefusal', () => {
+  const master = '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266';
+
+  it('should let an agent address that is not the master wallet through', () => {
+    expect(
+      masterWalletRefusal('0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf', master),
+    ).toBeNull();
+  });
+
+  // La base garde le wallet en minuscules, la dérivation rend l'EIP-55 : la
+  // casse ne doit pas laisser passer la clé maîtresse.
+  it('should refuse the master wallet key whatever the case', () => {
+    expect(
+      masterWalletRefusal('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', master),
+    ).toMatch(/^This key belongs to the master wallet .*: never store it\./);
   });
 });
