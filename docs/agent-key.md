@@ -43,16 +43,44 @@ test créé puis retiré :
 
 Un agent créé depuis cette page a donc **toujours** un nom et une expiration.
 
-⚠️ **Le fuseau est déduit, pas mesuré.** L'agent a été autorisé vers 12:00 à Paris (11:00 UTC),
-et 11:00:28 UTC + 180 × 24 h donne 13:00:28 en heure d'été de Paris. La page afficherait donc
-l'heure **locale du navigateur**, au format de la locale française, jour d'abord. D'où une
-saisie `DD/MM/YYYY HH:mm:ss` lue dans le fuseau **du navigateur**, que le script demande : celui
-de la machine n'est proposé que par défaut (Entrée), puisqu'un serveur en UTC décalerait tout de
-deux heures sans rien dire. Seul un nom IANA est accepté ; un décalage fixe (`+01:00`) est
-refusé, car il ignore l'heure d'été. Le fuseau était codé en dur (`Europe/Paris`) jusqu'au
-2026-11-05. Le
-premier appel à `extraAgents` (info, documenté seulement dans le SDK Python) au test final
-tranchera : il renvoie `validUntil` en entier, d'unité non documentée.
+**La page affiche l'heure locale du navigateur, heure d'été comprise : mesuré le 2026-11-05.**
+L'agent `winter_26-27_key` a été autorisé avec MAX vers 20:48 à Paris (heure d'hiver, UTC+1).
+La page a écrit `04/05/2027 21:48:13`, et `extraAgents` sur le wallet maître a répondu :
+
+```text
+[{"name":"winter_26-27_key","address":"0xb14c5d96e8bf1cfba03d36b9acf5818316f322d6","validUntil":1809460093543}]
+```
+
+- `validUntil` est en **millisecondes** depuis l'époque Unix : 2027-05-04T19:48:13.543Z, soit
+  21:48:13 à Paris en heure d'été, la valeur de la page à la seconde près ;
+- la validité vaut **exactement 180 × 24 h** depuis l'autorisation (2026-11-05T19:48:13.543Z,
+  20:48:13 à Paris) : ni « même heure murale » (la page aurait écrit 20:48:13), ni UTC (19:48:13) ;
+- le format est **jour d'abord** : `04/05` lu mois d'abord tomberait le 5 avril, pas à 180 jours ;
+- la page **tronque les millisecondes** : la date saisie (`…13.000Z`) précède l'expiration
+  réelle de 543 ms, donc le gateway refuse de signer une demi-seconde trop tôt, jamais trop tard ;
+- l'adresse revient **en minuscules** ; le gateway compare sans tenir compte de la casse.
+
+Une première observation, le même jour avec un agent de test autorisé vers 12:00 et affiché
+`13:00:28`, l'avait seulement laissé déduire.
+
+D'où une saisie `DD/MM/YYYY HH:mm:ss` lue dans le fuseau **du navigateur**, que le script
+demande : celui de la machine n'est proposé que par défaut (Entrée), puisqu'un serveur en UTC
+décalerait tout de deux heures sans rien dire. Seul un nom IANA est accepté ; un décalage fixe
+(`+01:00`) est refusé, car il ignore l'heure d'été. Le fuseau était codé en dur (`Europe/Paris`)
+jusqu'au 2026-11-05.
+
+`extraAgents` (info, documenté **seulement** dans la docstring du SDK Python, absent de la page
+de l'endpoint info) liste les agents **nommés** du wallet maître qu'on lui passe. Deux constats
+du même jour :
+
+- un agent **expiré n'y figure plus** : avant la création de `winter_26-27_key`, la réponse
+  était `[]`, alors que l'ancien agent (0x1817…2d17, refusé le 2026-10-29) avait expiré ;
+- une liste vide est donc **ambiguë** — aucun agent, ou une adresse qui n'est pas celle du
+  wallet maître (celle d'un agent, par exemple). Une vérification automatique ne pourra pas en
+  conclure seule que l'agent a disparu.
+
+⚠️ Son poids dans la limite de débit reste non documenté ; le garde du gateway compterait 20 par
+défaut. Il n'a été appelé qu'à la main, une fois à chaque fois.
 
 ## Le déroulé du script
 
