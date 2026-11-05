@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from './user.schema';
-import type { AgentKey } from './agent-key';
+import type { AgentInfo, AgentKey } from './agent-key';
 
 export type SafeUser = Omit<User, 'password' | 'agentKey'>;
 
@@ -52,7 +52,9 @@ export class UsersService {
   }
 
   async findByIdWithAgentKey(id: string): Promise<User | null> {
-    return this.userModel.findById(id).select('agentKey').exec();
+    // La clé et ses données publiques : le gateway refuse de signer sans
+    // l'expiration et l'adresse déclarées.
+    return this.userModel.findById(id).select('agentKey agent').exec();
   }
 
   async updateStrategy(userId: string, strategyData: Record<string, unknown>) {
@@ -70,7 +72,13 @@ export class UsersService {
       .exec();
   }
 
-  async updateAgentKey(userId: string, agentKey: AgentKey) {
-    return this.userModel.findByIdAndUpdate(userId, { agentKey });
+  /**
+   * La clé et ses données publiques en une seule mise à jour : une clé neuve
+   * avec l'expiration de l'ancienne ferait refuser ou laisser passer à tort.
+   */
+  async updateAgentKey(userId: string, agentKey: AgentKey, agent: AgentInfo) {
+    return this.userModel.findByIdAndUpdate(userId, {
+      $set: { agentKey, agent },
+    });
   }
 }

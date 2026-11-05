@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { isValidObjectId } from 'mongoose';
-import { JweUtil } from '@syldel/crypto-utils';
+import { EthAddressUtil, JweUtil } from '@syldel/crypto-utils';
 import {
   colors,
   promptConfirm,
@@ -11,6 +11,13 @@ import { AppModule } from '../src/app.module';
 import { UsersService } from '../src/users/users.service';
 import { User } from '../src/users/user.schema';
 import { agentKeyContext } from '../src/users/agent-key';
+import {
+  DASHBOARD_FORMAT_HINT,
+  describeValidUntil,
+  parseDashboardValidUntil,
+  resolveTimeZone,
+  validateAgentName,
+} from '../src/users/agent-validity';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -80,6 +87,86 @@ async function bootstrap() {
         'Invalid Agent Private Key. Must start with 0x and be 66 characters long (64 hex characters after 0x).',
     });
 
+    // L'adresse se dérive de la clé, elle ne se recopie pas : la comparer à
+    // celle de la page API attrape une clé collée par erreur (un autre agent,
+    // une clé tronquée qui reste au bon format).
+    const agentAddress = EthAddressUtil.fromPrivateKey(agentPrivateKey);
+    console.log(
+      colors.cyanText(`Agent address derived from this key: ${agentAddress}`),
+    );
+    const sameAddress = await promptConfirm(
+      'Does the API page show exactly this API Wallet Address?',
+      false,
+    );
+    if (!sameAddress) {
+      console.log(
+        colors.yellowText(
+          'Nothing saved: the key does not match the agent on the API page.',
+        ),
+      );
+      process.exit(1);
+    }
+
+    const agentName = await promptText(
+      'Enter API Wallet Name (as on the API page)',
+      {
+        validate: validateAgentName,
+      },
+    );
+
+    // La page API affiche « Valid Until » dans le fuseau du navigateur qui l'a
+    // ouverte. Celui de cette machine n'est qu'une proposition : ce peut être
+    // un serveur en UTC. Le fuseau retenu est réécrit dans la confirmation.
+    const machineTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timeZoneInput = await promptText(
+      `Time zone of the browser showing the API page (IANA name, Enter for ${machineTimeZone})`,
+      {
+        validate: (value) => {
+          const result = resolveTimeZone(value, machineTimeZone);
+          return result.ok || result.reason;
+        },
+      },
+    );
+    const zone = resolveTimeZone(timeZoneInput, machineTimeZone);
+    if (!zone.ok) throw new Error(`Time zone refused: ${zone.reason}`);
+    const timeZone = zone.timeZone;
+
+    // Recopiée de la colonne « Valid Until », obligatoire : sans elle, le
+    // gateway refuse de signer, et le mobile ne peut pas prévenir avant
+    // l'expiration.
+    const validUntilInput = await promptText(
+      `Enter Valid Until (${DASHBOARD_FORMAT_HINT}, ${timeZone} time, as on the API page)`,
+      {
+        validate: (value) => {
+          const result = parseDashboardValidUntil(value, timeZone, new Date());
+          return result.ok || result.reason;
+        },
+      },
+    );
+    const parsed = parseDashboardValidUntil(
+      validUntilInput,
+      timeZone,
+      new Date(),
+    );
+    if (!parsed.ok) {
+      // L'invite vient de l'accepter ; seule une seconde écoulée entre les deux
+      // (une date à la limite) peut la refuser ici.
+      throw new Error(`Valid Until refused: ${parsed.reason}`);
+    }
+    const validUntil = parsed.validUntil;
+    // Le mois en toutes lettres : une inversion jour/mois qui reste dans les
+    // 180 jours ne se voit qu'ici.
+    console.log(
+      colors.cyanText(
+        `Valid until ${describeValidUntil(validUntil, timeZone, new Date())}`,
+      ),
+    );
+    const sameDate = await promptConfirm('Is this the right date?', false);
+    if (!sameDate) {
+      console.log(colors.yellowText('Nothing saved.'));
+      process.exit(1);
+    }
+
     const masterKey = await promptText('Enter Master Key', {
       mask: true,
       validate: (value) =>
@@ -123,7 +210,12 @@ async function bootstrap() {
       );
       process.exit(1);
     }
-    await usersService.updateAgentKey(userId, sealed);
+    await usersService.updateAgentKey(userId, sealed, {
+      address: agentAddress,
+      name: agentName,
+      validUntil,
+      keyUpdatedAt: new Date(),
+    });
     console.log(colors.greenText('Agent key updated successfully'));
     // Le gateway garde les clés déchiffrées 7 jours en mémoire (UserClient) et
     // personne n'appelle sa synchro : sans redémarrage, il signe avec l'ancienne.

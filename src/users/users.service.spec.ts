@@ -1,4 +1,4 @@
-import { Model } from 'mongoose';
+import { Error, model, Model } from 'mongoose';
 import { User, UserSchema } from './user.schema';
 import { UsersService } from './users.service';
 
@@ -33,6 +33,60 @@ describe('User schema', () => {
       expect(UserSchema.path(path).options.select).toBe(false);
     },
   );
+
+  // Public à dessein : `/auth/me` le renvoie au mobile, qui affiche l'expiration.
+  it('should select the public agent data by default', () => {
+    expect(UserSchema.path('agent').options.select).toBeUndefined();
+  });
+
+  describe('agent', () => {
+    const UserModel = model('UserSchemaSpec', UserSchema);
+    const valid = {
+      address: '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf',
+      name: 'bot_main',
+      validUntil: new Date('2027-05-04T11:00:28Z'),
+      keyUpdatedAt: new Date('2026-11-05T11:05:00Z'),
+    };
+    // `validate` rejette avec une ValidationError dont `errors` nomme chaque
+    // chemin refusé ; `validateSync` est déprécié par Mongoose 9.
+    const errorsOf = async (agent: unknown): Promise<string[]> => {
+      try {
+        await new UserModel({
+          walletAddress: '0xa',
+          username: 'alice',
+          password: 'x',
+          agent,
+        }).validate();
+        return [];
+      } catch (error) {
+        return Object.keys((error as Error.ValidationError).errors);
+      }
+    };
+
+    it('should accept complete agent data, and its absence', async () => {
+      expect(await errorsOf(valid)).toEqual([]);
+      expect(await errorsOf(undefined)).toEqual([]);
+    });
+
+    // Un agent sans expiration enregistré en base passerait pour « inconnu »
+    // côté mobile ; il doit être refusé à l'écriture.
+    it.each(['address', 'name', 'validUntil', 'keyUpdatedAt'])(
+      'should refuse agent data without %s',
+      async (field) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [field as keyof typeof valid]: _omitted, ...partial } = valid;
+        expect(await errorsOf(partial)).toEqual([`agent.${field}`]);
+      },
+    );
+
+    it.each([
+      ['a malformed address', { address: '0x123' }, 'agent.address'],
+      ['a 17-character name', { name: 'x'.repeat(17) }, 'agent.name'],
+      ['an unreadable date', { validUntil: 'soon' }, 'agent.validUntil'],
+    ])('should refuse %s', async (_label, change, path) => {
+      expect(await errorsOf({ ...valid, ...change })).toEqual([path]);
+    });
+  });
 });
 
 describe('UsersService', () => {
@@ -62,10 +116,30 @@ describe('UsersService', () => {
     },
   );
 
-  it('should select only the agent key for the internal route', async () => {
+  it('should select only the agent key and its public data for the internal route', async () => {
     const { model, projections } = fakeModel();
     await serviceWith(model).findByIdWithAgentKey('u1');
-    expect(projections).toEqual(['agentKey']);
+    expect(projections).toEqual(['agentKey agent']);
+  });
+
+  // Les deux ensemble ou rien : une clé neuve sous l'expiration de l'ancienne
+  // ferait refuser, ou signer, à tort.
+  it('should write the agent key and its public data in one update', async () => {
+    const findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+    const service = new UsersService({
+      findByIdAndUpdate,
+    } as unknown as ConstructorParameters<typeof UsersService>[0]);
+    const agent = {
+      address: '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf',
+      name: 'bot_main',
+      validUntil: new Date('2027-05-04T11:00:28Z'),
+      keyUpdatedAt: new Date('2026-11-05T11:05:00Z'),
+    };
+    await service.updateAgentKey('u1', 'sealed.jwe', agent);
+    expect(findByIdAndUpdate).toHaveBeenCalledTimes(1);
+    expect(findByIdAndUpdate).toHaveBeenCalledWith('u1', {
+      $set: { agentKey: 'sealed.jwe', agent },
+    });
   });
 
   it('should strip the password hash and agent key from a created user', async () => {

@@ -22,6 +22,51 @@ export function agentKeyContext(userId: string): string {
 }
 
 /**
+ * Les données publiques de l'agent, enregistrées avec la clé par
+ * `set-agent-key` (voir `agent-validity.ts`). Côté mobile :
+ * `ExternalUserAgent` de trading-shared-types ; côté gateway, la réponse de
+ * `agent-credentials` (`nest-hyperliquid-gateway`, `src/auth/agent-key.ts`).
+ * Les trois formes doivent rester identiques.
+ */
+export interface AgentInfo {
+  address: string;
+  name: string;
+  validUntil: Date;
+  keyUpdatedAt: Date;
+}
+
+/**
+ * Lit le sous-document `agent`. Absent : `null`, que le gateway refuse en le
+ * nommant (une clé enregistrée avant qu'on demande son expiration). Présent
+ * mais mal formé : une erreur, jamais une valeur devinée — une date illisible
+ * prise pour « pas d'expiration » laisserait signer avec un agent mort.
+ */
+export function readStoredAgent(stored: unknown): AgentInfo | null {
+  if (stored === undefined || stored === null) return null;
+  const agent = stored as Partial<Record<keyof AgentInfo, unknown>>;
+  const isDate = (v: unknown): v is Date =>
+    v instanceof Date && !Number.isNaN(v.getTime());
+  if (
+    typeof agent.address === 'string' &&
+    /^0x[0-9a-fA-F]{40}$/.test(agent.address) &&
+    typeof agent.name === 'string' &&
+    agent.name.length > 0 &&
+    isDate(agent.validUntil) &&
+    isDate(agent.keyUpdatedAt)
+  ) {
+    return {
+      address: agent.address,
+      name: agent.name,
+      validUntil: agent.validUntil,
+      keyUpdatedAt: agent.keyUpdatedAt,
+    };
+  }
+  throw new InternalServerErrorException(
+    'The stored agent data has an unexpected shape: run set-agent-key again',
+  );
+}
+
+/**
  * Lit ce qui est stocké en base. Le champ est `Mixed` et non `String` : mesuré
  * avec Mongoose 9.3.0, un chemin `String` lit un objet 1.x comme `undefined`
  * sans rien dire, et la route aurait répondu « aucune clé configurée » au lieu

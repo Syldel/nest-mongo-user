@@ -5,7 +5,7 @@ import {
   Get,
   Param,
 } from '@nestjs/common';
-import { readStoredAgentKey } from './agent-key';
+import { readStoredAgent, readStoredAgentKey } from './agent-key';
 import { UsersService } from './users.service';
 import { ServiceAccess } from '../auth/service-access.decorator';
 
@@ -36,7 +36,12 @@ export class InternalUsersController {
     const user = await this.usersService.findByIdWithAgentKey(userId);
 
     // Un objet JSON et non la chaîne nue : Nest renverrait une chaîne en
-    // text/html, et le gateway lit `response.json()`.
-    return { agentKey: readStoredAgentKey(user?.agentKey) };
+    // text/html, et le gateway lit `response.json()`. `agent` vaut `null`
+    // plutôt qu'être absent : le gateway distingue « aucune donnée » d'une
+    // réponse tronquée, et refuse de signer dans les deux cas.
+    return {
+      agentKey: readStoredAgentKey(user?.agentKey),
+      agent: readStoredAgent(user?.agent),
+    };
   }
 }

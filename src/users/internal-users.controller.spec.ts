@@ -69,11 +69,39 @@ describe('InternalUsersController', () => {
 
     // Un objet et non la chaîne nue : Nest enverrait une chaîne en text/html,
     // et le gateway lit `response.json()`.
-    it('should return the sealed key as is, inside a JSON object', async () => {
+    const agent = {
+      address: '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf',
+      name: 'bot_main',
+      validUntil: new Date('2027-05-04T11:00:28Z'),
+      keyUpdatedAt: new Date('2026-11-05T11:05:00Z'),
+    };
+
+    it('should return the sealed key as is and its public data, inside a JSON object', async () => {
+      const controller = controllerReturning({ agentKey, agent });
+      await expect(controller.getAgentCredentials('u1')).resolves.toEqual({
+        agentKey,
+        agent,
+      });
+    });
+
+    // Une clé enregistrée avant qu'on demande son expiration : la route la
+    // sert, et c'est le gateway qui refuse de signer en le nommant.
+    it('should answer agent: null for a key stored without its data', async () => {
       const controller = controllerReturning({ agentKey });
       await expect(controller.getAgentCredentials('u1')).resolves.toEqual({
         agentKey,
+        agent: null,
       });
+    });
+
+    it('should refuse malformed agent data instead of guessing', async () => {
+      const controller = controllerReturning({
+        agentKey,
+        agent: { ...agent, validUntil: 'soon' },
+      });
+      await expect(controller.getAgentCredentials('u1')).rejects.toThrow(
+        'The stored agent data has an unexpected shape: run set-agent-key again',
+      );
     });
 
     it('should name a key still stored in the crypto-utils 1.x format', async () => {
